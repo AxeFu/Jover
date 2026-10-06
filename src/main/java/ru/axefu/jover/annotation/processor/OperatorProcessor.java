@@ -1,6 +1,5 @@
 package ru.axefu.jover.annotation.processor;
 
-import com.sun.source.tree.*;
 import com.sun.source.util.Trees;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Type;
@@ -23,7 +22,6 @@ import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.TypeKind;
-import javax.tools.Diagnostic;
 import java.lang.reflect.Method;
 import java.util.Set;
 
@@ -58,25 +56,24 @@ public class OperatorProcessor extends AbstractProcessor {
                     JCTree tree = (JCTree) trees.getTree(element);
                     tree.accept(new TreeTranslator() {
                         @Override
-                        public void visitAssignop(JCAssignOp tree) {
-                            super.visitAssignop(tree);
-                            if (tree.lhs == null || tree.lhs.type == null) return;
-                            if (tree.lhs.type.getKind() != TypeKind.DECLARED) return;
-                            if (tree.lhs.type.toString().equals("java.lang.String")) return;
+                        public void visitAssignop(JCAssignOp jcAssignOp) {
+                            super.visitAssignop(jcAssignOp);
+                            if (isPrimitive(jcAssignOp.lhs)) return;
 
-                            JCMethodInvocation methodCall = createMethod(tree.lhs, getMethodName(tree.getTag()), tree.rhs);
+                            JCMethodInvocation methodCall = createMethod(jcAssignOp.lhs, getMethodName(jcAssignOp.getTag()), jcAssignOp.rhs);
                             if (methodCall == null) return;
-                            result = make.Assign(tree.lhs, methodCall);
+                            result = make.Assign(jcAssignOp.lhs, methodCall);
                             result.type = methodCall.type;
                         }
 
                         @Override
-                        public void visitBinary(JCBinary tree) {
-                            super.visitBinary(tree);
-                            if (tree.lhs == null || tree.lhs.type == null) return;
-                            if (tree.lhs.type.getKind() != TypeKind.DECLARED) return;
-                            if (tree.lhs.type.toString().equals("java.lang.String")) return;
-                            result = createMethod(tree.lhs, getMethodName(tree.getTag()), tree.rhs);
+                        public void visitBinary(JCBinary jcBinary) {
+                            super.visitBinary(jcBinary);
+                            if (isPrimitive(jcBinary.lhs)) return;
+
+                            JCMethodInvocation methodCall = createMethod(jcBinary.lhs, getMethodName(jcBinary.getTag()), jcBinary.rhs);
+                            if (methodCall == null) return;
+                            result = methodCall;
                         }
                     });
                 }
@@ -84,6 +81,12 @@ public class OperatorProcessor extends AbstractProcessor {
             return true;
         }
         return false;
+    }
+
+    private boolean isPrimitive(JCExpression expression) {
+        return expression == null || expression.type == null ||
+                expression.type.getKind() != TypeKind.DECLARED ||
+                expression.type.toString().equals("java.lang.String");
     }
 
     private JCMethodInvocation createMethod(JCExpression lhs, String methodName, JCExpression rhs) {
