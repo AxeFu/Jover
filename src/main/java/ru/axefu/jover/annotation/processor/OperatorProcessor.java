@@ -52,8 +52,8 @@ public class OperatorProcessor extends AbstractProcessor {
                         @Override
                         public void visitBinary(JCBinary jcBinary) {
                             super.visitBinary(jcBinary);
-                            if (jcBinary.lhs.type.toString().equals("java.lang.String")) return;
                             if (jcBinary.lhs.type.getKind() != TypeKind.DECLARED) return;
+                            if (jcBinary.lhs.type.toString().equals("java.lang.String")) return;
 
                             String method = getMethodName(jcBinary.getTag());
                             if (!method.isEmpty()) {
