@@ -52,14 +52,11 @@ public class OperatorProcessor extends AbstractProcessor {
                         @Override
                         public void visitBinary(JCBinary jcBinary) {
                             super.visitBinary(jcBinary);
-                            if (jcBinary.lhs.type.getKind() == TypeKind.DECLARED && !jcBinary.lhs.type.toString().equals("java.lang.String")) {
-                                String method = "";
-                                switch (jcBinary.getTag()) {
-                                    case PLUS: method = "add"; break;
-                                    case MINUS: method = "subtract"; break;
-                                    case MUL: method = "multiply"; break;
-                                    case DIV: method = "divide"; break;
-                                }
+                            if (jcBinary.lhs.type.toString().equals("java.lang.String")) return;
+                            if (jcBinary.lhs.type.getKind() != TypeKind.DECLARED) return;
+
+                            String method = getMethodName(jcBinary.getTag());
+                            if (!method.isEmpty()) {
                                 result = make.Apply(List.nil(), make.Select(jcBinary.lhs, names.fromString(method)), List.of(jcBinary.rhs));
                             }
                         }
@@ -69,6 +66,16 @@ public class OperatorProcessor extends AbstractProcessor {
             return true;
         }
         return false;
+    }
+
+    private String getMethodName(Tag operation) {
+        switch (operation) {
+            case PLUS: return "add";
+            case MINUS: return "subtract";
+            case MUL: return "multiply";
+            case DIV: return "divide";
+        }
+        return "";
     }
 
     private static <T> T jbUnwrap(Class<? extends T> iface, T wrapper) {
