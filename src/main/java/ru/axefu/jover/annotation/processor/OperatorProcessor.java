@@ -52,7 +52,7 @@ public class OperatorProcessor extends AbstractProcessor {
                         @Override
                         public void visitBinary(JCBinary jcBinary) {
                             super.visitBinary(jcBinary);
-                            if (jcBinary.lhs.type.getKind() == TypeKind.DECLARED) {
+                            if (jcBinary.lhs.type.getKind() == TypeKind.DECLARED && !jcBinary.lhs.type.toString().equals("java.lang.String")) {
                                 String method = "";
                                 switch (jcBinary.getTag()) {
                                     case PLUS: method = "add"; break;
