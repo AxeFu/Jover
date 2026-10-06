@@ -23,6 +23,7 @@ import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.TypeKind;
+import javax.tools.Diagnostic;
 import java.lang.reflect.Method;
 import java.util.Set;
 
@@ -57,28 +58,25 @@ public class OperatorProcessor extends AbstractProcessor {
                     JCTree tree = (JCTree) trees.getTree(element);
                     tree.accept(new TreeTranslator() {
                         @Override
-                        public void visitBinary(JCBinary jcBinary) {
-                            super.visitBinary(jcBinary);
-                            if (jcBinary.lhs == null || jcBinary.lhs.type == null) return;
-                            if (jcBinary.lhs.type.getKind() != TypeKind.DECLARED) return;
-                            if (jcBinary.lhs.type.toString().equals("java.lang.String")) return;
+                        public void visitAssignop(JCAssignOp tree) {
+                            super.visitAssignop(tree);
+                            if (tree.lhs == null || tree.lhs.type == null) return;
+                            if (tree.lhs.type.getKind() != TypeKind.DECLARED) return;
+                            if (tree.lhs.type.toString().equals("java.lang.String")) return;
 
-                            String method = getMethodName(jcBinary.getTag());
-                            Symbol.MethodSymbol methodSymbol = findMethod(
-                                    jcBinary.lhs.type,
-                                    names.fromString(method),
-                                    jcBinary.rhs.type
-                            );
+                            JCMethodInvocation methodCall = createMethod(tree.lhs, getMethodName(tree.getTag()), tree.rhs);
+                            if (methodCall == null) return;
+                            result = make.Assign(tree.lhs, methodCall);
+                            result.type = methodCall.type;
+                        }
 
-                            if (methodSymbol == null)
-                                return;
-
-                            JCFieldAccess select = make.Select(jcBinary.lhs, names.fromString(method));
-                            select.sym = methodSymbol;
-                            select.type = methodSymbol.type;
-
-                            result = make.Apply(List.nil(), select, List.of(jcBinary.rhs));
-                            result.type = select.type.getReturnType();
+                        @Override
+                        public void visitBinary(JCBinary tree) {
+                            super.visitBinary(tree);
+                            if (tree.lhs == null || tree.lhs.type == null) return;
+                            if (tree.lhs.type.getKind() != TypeKind.DECLARED) return;
+                            if (tree.lhs.type.toString().equals("java.lang.String")) return;
+                            result = createMethod(tree.lhs, getMethodName(tree.getTag()), tree.rhs);
                         }
                     });
                 }
@@ -86,6 +84,17 @@ public class OperatorProcessor extends AbstractProcessor {
             return true;
         }
         return false;
+    }
+
+    private JCMethodInvocation createMethod(JCExpression lhs, String methodName, JCExpression rhs) {
+        Symbol.MethodSymbol methodSymbol = findMethod(lhs.type, names.fromString(methodName), rhs.type);
+        if (methodSymbol == null) return null;
+        JCFieldAccess select = make.Select(lhs, names.fromString(methodName));
+        select.sym = methodSymbol;
+        select.type = methodSymbol.type;
+        JCMethodInvocation result = make.Apply(List.nil(), select, List.of(rhs));
+        result.type = select.type.getReturnType();
+        return result;
     }
 
     private Symbol.MethodSymbol findMethod(Type recieverType, Name methodName, Type argumentType) {
@@ -113,9 +122,13 @@ public class OperatorProcessor extends AbstractProcessor {
 
     private String getMethodName(Tag operation) {
         switch (operation) {
+            case PLUS_ASG:
             case PLUS: return "add";
+            case MINUS_ASG:
             case MINUS: return "subtract";
+            case MUL_ASG:
             case MUL: return "multiply";
+            case DIV_ASG:
             case DIV: return "divide";
         }
         return "";
