@@ -1,6 +1,6 @@
 # Java 8 Overloading
-Intelij IDEA plugin for Suppress binary warnings
-https://github.com/AxeFu/JoverIntellij
+Intelij IDEA [plugin](https://github.com/AxeFu/JoverIntellij) for Suppress binary warnings
+
 # Method names:
 * add is +
 * subtract is -
