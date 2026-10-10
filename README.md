@@ -1,5 +1,5 @@
-# Java 8 Overloading
-Перегрузка бинарных операторов JDK 8.
+# Java Overloading
+Перегрузка бинарных операторов
 Intelij IDEA [plugin](https://github.com/AxeFu/JoverIntellij) для подавления варнингов.
 
 # Methods Map:
