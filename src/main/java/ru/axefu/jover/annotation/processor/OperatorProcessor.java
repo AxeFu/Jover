@@ -9,10 +9,7 @@ import com.sun.tools.javac.processing.JavacProcessingEnvironment;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.TreeMaker;
 import com.sun.tools.javac.tree.TreeTranslator;
-import com.sun.tools.javac.util.Context;
-import com.sun.tools.javac.util.List;
-import com.sun.tools.javac.util.Name;
-import com.sun.tools.javac.util.Names;
+import com.sun.tools.javac.util.*;
 
 import static com.sun.tools.javac.tree.JCTree.*;
 
@@ -26,14 +23,14 @@ import java.lang.reflect.Method;
 import java.util.Set;
 
 @SupportedAnnotationTypes("*")
-@SupportedSourceVersion(SourceVersion.RELEASE_8)
 public class OperatorProcessor extends AbstractProcessor {
 
     private Trees trees;
     private TreeMaker make;
     private Names names;
-    private Attr attr;
     private Types types;
+    private Attr attr;
+    private Log log;
 
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
@@ -43,8 +40,14 @@ public class OperatorProcessor extends AbstractProcessor {
         Context context = ((JavacProcessingEnvironment)unwrappedEnv).getContext();
         make = TreeMaker.instance(context);
         names = Names.instance(context);
-        attr = Attr.instance(context);
         types = Types.instance(context);
+        attr = Attr.instance(context);
+        log = Log.instance(context);
+    }
+
+    @Override
+    public SourceVersion getSupportedSourceVersion() {
+        return SourceVersion.latest();
     }
 
     @Override
@@ -52,8 +55,8 @@ public class OperatorProcessor extends AbstractProcessor {
         if (!roundEnv.processingOver()) {
             for (Element element : roundEnv.getRootElements()) {
                 if (element.getKind() == ElementKind.CLASS) {
-                    attr.attribClass(null, (Symbol.ClassSymbol) element);
                     JCTree tree = (JCTree) trees.getTree(element);
+                    attribClass(element);
                     tree.accept(new TreeTranslator() {
                         @Override
                         public void visitAssignop(JCAssignOp jcAssignOp) {
@@ -83,6 +86,15 @@ public class OperatorProcessor extends AbstractProcessor {
         return false;
     }
 
+    private void attribClass(Element element) {
+        Log.DiscardDiagnosticHandler handler = log.new DiscardDiagnosticHandler();
+        try {
+            attr.attribClass((JCTree) trees.getTree(element), (Symbol.ClassSymbol) element);
+        } finally {
+            log.popDiagnosticHandler(handler);
+        }
+    }
+
     private boolean isPrimitive(JCExpression expression) {
         return expression == null || expression.type == null ||
                 expression.type.getKind() != TypeKind.DECLARED ||
@@ -103,12 +115,11 @@ public class OperatorProcessor extends AbstractProcessor {
     private Symbol.MethodSymbol findMethod(Type recieverType, Name methodName, Type argumentType) {
         if (methodName.isEmpty()) return null;
         Symbol.ClassSymbol clazz = (Symbol.ClassSymbol) recieverType.tsym;
-        for (Symbol symbol : clazz.members().getElementsByName(methodName)) {
-            if (!(symbol instanceof Symbol.MethodSymbol)) {
+        for (Symbol symbol : clazz.members().getSymbolsByName(methodName)) {
+            if (!(symbol instanceof Symbol.MethodSymbol method)) {
                 continue;
             }
 
-            Symbol.MethodSymbol method = (Symbol.MethodSymbol) symbol;
             Type.MethodType mt = (Type.MethodType) method.type;
             if (mt.argtypes.size() != 1) {
                 continue;
@@ -124,17 +135,13 @@ public class OperatorProcessor extends AbstractProcessor {
     }
 
     private String getMethodName(Tag operation) {
-        switch (operation) {
-            case PLUS_ASG:
-            case PLUS: return "add";
-            case MINUS_ASG:
-            case MINUS: return "subtract";
-            case MUL_ASG:
-            case MUL: return "multiply";
-            case DIV_ASG:
-            case DIV: return "divide";
-        }
-        return "";
+        return switch (operation) {
+            case PLUS_ASG, PLUS -> "add";
+            case MINUS_ASG, MINUS -> "subtract";
+            case MUL_ASG, MUL -> "multiply";
+            case DIV_ASG, DIV -> "divide";
+            default -> "";
+        };
     }
 
     private static <T> T jbUnwrap(@SuppressWarnings("SpellCheckingInspection") Class<? extends T> iface, T wrapper) {
